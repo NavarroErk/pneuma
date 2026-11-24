@@ -1,0 +1,12 @@
+[project]
+name = "pneuma"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "NavarroErk", email = "navarroerk@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.165.0",
+]

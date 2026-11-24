@@ -1,0 +1,30 @@
+# Runtime data (mounted via docker-compose volumes)
+data/
+
+# Backend (Python)
+backend/.venv/
+backend/uploads/
+backend/db/
+backend/logs/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Frontend
+node_modules/
+frontend/src-tauri/target/
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

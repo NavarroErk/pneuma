@@ -1,0 +1,18 @@
+services:
+  app:
+    container_name: pneuma
+    image: ghcr.io/navarroerk/pneuma:latest
+    ports:
+      - "6650:6650"
+    volumes:
+      - ./data/uploads:/app/uploads
+      - ./data/logs:/app/logs
+      - ./data/db:/app/db
+    environment:
+      - TZ=UTC
+      - PUID=1000
+      - PGID=1000
+      - MAX_FILE_SIZE_MB=500
+      - MAX_TEXT_LENGTH=5000
+      - DEFAULT_TTL_MINUTES=120
+    restart: unless-stopped

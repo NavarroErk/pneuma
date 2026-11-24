@@ -1,0 +1,22 @@
+# Build context is the repo root, so paths are relative to it.
+.git
+.github
+data/
+docker-compose.yml
+**/.env
+**/.env.*
+
+# Backend
+backend/.venv
+backend/uploads/
+backend/db/
+backend/logs/
+**/__pycache__
+**/*.pyc
+
+# Frontend
+frontend/node_modules
+frontend/src-tauri/target
+
+**/*.log
+**/.DS_Store
