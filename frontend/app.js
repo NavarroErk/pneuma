@@ -29,6 +29,7 @@ let uploading = false;
 let lastSignature = "";
 let maxTextLength = 0; // set from /config
 let maxFileBytes = 0; // set from /config
+let maxTtl = 0; // minutes, set from /config
 
 // current/max - under the textarea; red when over
 function updateCounter() {
@@ -75,6 +76,11 @@ function toggleStaged(on) {
   setStatus("");
   setProgress($("progress"), null);
 }
+
+// confirm leaving page while uploading is true
+window.addEventListener("beforeunload", (e) => {
+  if (uploading) e.preventDefault();
+});
 
 // open file dropper on click, ignore while previewing
 dropper.addEventListener("click", (e) => {
@@ -143,6 +149,11 @@ async function upload() {
     form.append("text", $("staged-text").value);
   else return setStatus("Nothing to submit.", true);
 
+  const ttl = Math.round(+$("ttl-h").value * 60 + +$("ttl-m").value);
+  if (maxTtl && (ttl < 1 || ttl > maxTtl))
+    return setStatus(`Expiry must be 1m – ${formatDuration(maxTtl)}`, true);
+  if (ttl) form.append("ttl_minutes", ttl);
+
   const isFile = staged.type === "file";
   setUploading(true);
   setStatus("Sending…");
@@ -154,6 +165,7 @@ async function upload() {
     });
     clearStaged();
     showToast("Synced");
+    loadConfig();
     refresh();
   } catch (msg) {
     setProgress($("progress"), null);
@@ -421,6 +433,10 @@ async function loadConfig() {
   if (!res) return;
   maxTextLength = res["max_text_length"];
   maxFileBytes = res["max_file_size_mb"] * 1024 * 1024;
+  maxTtl = res["max_ttl_minutes"];
+  $("ttl-h").max = Math.floor(maxTtl / 60);
+  $("ttl-h").value = Math.floor(res["default_ttl_minutes"] / 60);
+  $("ttl-m").value = res["default_ttl_minutes"] % 60;
   $("cfg-max-file").textContent = formatBytes(
     res["max_file_size_mb"] * 1024 * 1024,
   );

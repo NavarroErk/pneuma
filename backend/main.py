@@ -82,6 +82,7 @@ async def post_entries(
   type: Literal["text", "file"] = Form(...),
   file: UploadFile | None = File(None),
   text: str | None = Form(None),
+  ttl_minutes: int = Form(DEFAULT_TTL_MINUTES, ge=1, le=MAX_TTL_MINUTES),
   user_id: str = Depends(get_current_user),
   conn = Depends(get_db)
   ):
@@ -119,7 +120,7 @@ async def post_entries(
   elif type == "text":
       # form uploads turn \n into \r\n to avoid extra invis chars
       text = (text or "").replace("\r\n", "\n")
-      if not text:
+      if not text.strip():
           raise HTTPException(400, "No text provided")
       if len(text) > MAX_TEXT_LENGTH:
           raise HTTPException(413, f"Text too long. Maximum: {MAX_TEXT_LENGTH} characters")
@@ -129,7 +130,7 @@ async def post_entries(
         
   now = int(datetime.now().timestamp())
   created_at = now
-  expires_at = (now + (DEFAULT_TTL_MINUTES * 60))
+  expires_at = (now + (ttl_minutes * 60))
   
 
   try:
