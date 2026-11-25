@@ -9,7 +9,7 @@ import uuid
 import mimetypes
 import asyncio
 
-from config import init_directories, MAX_FILE_SIZE_MB, MAX_TEXT_LENGTH, DEFAULT_TTL_MINUTES, UPLOADS_DIR, FRONTEND_DIR
+from config import init_directories, MAX_FILE_SIZE_MB, MAX_TEXT_LENGTH, DEFAULT_TTL_MINUTES, MAX_TTL_MINUTES, UPLOADS_DIR, FRONTEND_DIR
 from db import init_db, get_db, cleanup_loop, cleanup_expired
 from auth import get_current_user
 from pathlib import Path
@@ -33,6 +33,15 @@ app = FastAPI(lifespan=lifespan)
 @app.get("/health")
 def get_health():
   return {"status": "ok"}
+
+@app.get("/config")
+def get_config():
+  return {
+    "max_file_size_mb": MAX_FILE_SIZE_MB,
+    "max_text_length": MAX_TEXT_LENGTH,
+    "default_ttl_minutes": DEFAULT_TTL_MINUTES,
+    "max_ttl_minutes": MAX_TTL_MINUTES
+  }
 
 @app.get("/entries")
 def get_entries(user_id: str = Depends(get_current_user), conn = Depends(get_db)):
@@ -108,10 +117,12 @@ async def post_entries(
         raise HTTPException(413, f"File too large. Maximum Size: {MAX_FILE_SIZE_MB}MB")
       
   elif type == "text":
+      # form uploads turn \n into \r\n to avoid extra invis chars
+      text = (text or "").replace("\r\n", "\n")
       if not text:
           raise HTTPException(400, "No text provided")
       if len(text) > MAX_TEXT_LENGTH:
-          raise HTTPException(413, f"Text too long. Max: {MAX_TEXT_LENGTH} characters")
+          raise HTTPException(413, f"Text too long. Maximum: {MAX_TEXT_LENGTH} characters")
       text_content = text
       size = len(text)
       name = text[0:75]

@@ -1,7 +1,7 @@
 "use strict";
 
 const API_BASE = "";
-const POLL_MS = 3000;
+const POLL_MS = 2000;
 
 const $ = (id) => document.getElementById(id);
 const icon = (d) =>
@@ -27,6 +27,22 @@ let entries = []; // latest list from the server
 let staged = null; // item waiting for submit, or null
 let uploading = false;
 let lastSignature = "";
+let maxTextLength = 0; // set from /config
+let maxFileBytes = 0; // set from /config
+
+// current/max - under the textarea; red when over
+function updateCounter() {
+  const len = $("staged-text").value.length;
+  $("char-count").hidden = $("staged-text").hidden;
+  $("char-count").textContent = maxTextLength
+    ? `${len.toLocaleString()} / ${maxTextLength.toLocaleString()}`
+    : len.toLocaleString();
+  $("char-count").classList.toggle(
+    "over",
+    maxTextLength && len > maxTextLength,
+  );
+}
+$("staged-text").addEventListener("input", updateCounter);
 
 // staging - show preview for a file or text
 function stage(item) {
@@ -42,6 +58,7 @@ function stage(item) {
     $("staged-text").value = item.text;
   }
   toggleStaged(true);
+  updateCounter();
   (isFile ? $("submit-btn") : $("staged-text")).focus();
 }
 
@@ -90,12 +107,21 @@ dropper.addEventListener("drop", (e) => {
 
 // ctrl+v anywhere to stage files; text gets pasted into full size textbox
 document.addEventListener("paste", (e) => {
+  if (settings.open) return;
   const file = e.clipboardData.files[0];
   const text = e.clipboardData.getData("text/plain");
   if (e.target === $("staged-text") && !file) return;
   e.preventDefault();
   if (file) stage({ type: "file", file });
   else if (text) stage({ type: "text", text });
+});
+
+// settings popup
+const settings = $("settings");
+$("settings-btn").addEventListener("click", () => settings.showModal());
+$("settings-close").addEventListener("click", () => settings.close());
+settings.addEventListener("click", (e) => {
+  if (e.target === settings) settings.close();
 });
 
 $("submit-btn").addEventListener("click", upload);
@@ -106,8 +132,14 @@ async function upload() {
   if (!staged || uploading) return;
   const form = new FormData();
   form.append("type", staged.type);
-  if (staged.type === "file") form.append("file", staged.file);
-  else if ($("staged-text").value.trim())
+  if (staged.type === "file") {
+    if (maxFileBytes && staged.file.size > maxFileBytes)
+      return setStatus(
+        `File too large. Maximum: ${formatBytes(maxFileBytes)}`,
+        true,
+      );
+    form.append("file", staged.file);
+  } else if ($("staged-text").value.trim())
     form.append("text", $("staged-text").value);
   else return setStatus("Nothing to submit.", true);
 
@@ -153,7 +185,8 @@ function request(method, url, body, onProgress, responseType = "") {
     xhr.onload = () =>
       xhr.status < 300 ? resolve(xhr.response) : reject(errorMessage(xhr));
     xhr.onerror = () => reject("Couldn't reach the server.");
-    xhr.timeout = 10000;
+    // if body (file upload), no timeout
+    xhr.timeout = body ? 0 : 10000;
     xhr.ontimeout = () => reject("Server timed out.");
     xhr.send(body);
   });
@@ -173,11 +206,19 @@ function errorMessage(xhr) {
 async function refresh() {
   try {
     entries = await request("GET", `${API_BASE}/entries`, null, null, "json");
-    $("conn").classList.remove("offline");
-    $("conn").title = "Connected";
+    document
+      .querySelectorAll(".conn")
+      .forEach((element) => element.classList.remove("offline"));
+    document
+      .querySelectorAll(".conn")
+      .forEach((element) => (element.title = "Connected"));
   } catch {
-    $("conn").classList.add("offline");
-    $("conn").title = "Can't reach the server";
+    document
+      .querySelectorAll(".conn")
+      .forEach((element) => element.classList.add("offline"));
+    document
+      .querySelectorAll(".conn")
+      .forEach((element) => (element.title = "Can't reach the server"));
     return;
   }
 
@@ -295,8 +336,10 @@ function confirmed(btn, label = "Confirm") {
 
 const entryUrl = (id) => `${API_BASE}/entries/${encodeURIComponent(id)}`;
 
+// cleanse server values before parsing to HTML
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
 const firstLine = (text = "") =>
   text
     .split("\n")
@@ -306,12 +349,13 @@ const firstLine = (text = "") =>
 function updateTimes() {
   for (const el of document.querySelectorAll(".ttl")) {
     const left = Math.floor(el.dataset.expires - Date.now() / 1000);
-    el.textContent = left > 0 ? `${formatRemaining(left)} left` : "expiring…";
+    el.textContent =
+      left > 0 ? `${formatRemainingTime(left)} left` : "expiring…";
     el.classList.toggle("soon", left <= 60);
   }
 }
 
-function formatRemaining(s) {
+function formatRemainingTime(s) {
   const m = Math.floor(s / 60);
   const h = Math.floor(m / 60);
   const d = Math.floor(h / 24);
@@ -321,6 +365,16 @@ function formatRemaining(s) {
   if (d < 7) return h % 24 ? `${d}d ${h % 24}h` : `${d}d`;
   if (d < 30) return `${Math.floor(d / 7)}w`;
   return `${Math.floor(d / 30)}mo`;
+}
+
+// exact duration for config labels, 90 = "1h 30m"
+function formatDuration(minutes) {
+  const d = Math.floor(minutes / 1440);
+  const h = Math.floor((minutes % 1440) / 60);
+  const m = minutes % 60;
+  return (
+    [d && `${d}d`, h && `${h}h`, m && `${m}m`].filter(Boolean).join(" ") || "0m"
+  );
 }
 
 function formatBytes(bytes) {
@@ -351,7 +405,33 @@ function showToast(msg) {
   toastTimer = setTimeout(() => $("toast").classList.remove("show"), 1800);
 }
 
+async function getConfig() {
+  try {
+    const res = await request("GET", `${API_BASE}/config`, null, null, "json");
+    return res;
+  } catch {
+    showToast("Couldn't get config");
+    return null;
+  }
+}
+
+// populate settings labels from server values
+async function loadConfig() {
+  const res = await getConfig();
+  if (!res) return;
+  maxTextLength = res["max_text_length"];
+  maxFileBytes = res["max_file_size_mb"] * 1024 * 1024;
+  $("cfg-max-file").textContent = formatBytes(
+    res["max_file_size_mb"] * 1024 * 1024,
+  );
+  $("cfg-max-text").textContent =
+    res["max_text_length"].toLocaleString() + " Characters";
+  $("cfg-default-ttl").textContent = formatDuration(res["default_ttl_minutes"]);
+  $("cfg-max-ttl").textContent = formatDuration(res["max_ttl_minutes"]);
+}
+
 refresh();
+loadConfig();
 setInterval(updateTimes, 1000);
 setInterval(() => {
   if (!document.hidden) refresh();

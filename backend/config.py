@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 
-MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", 500))
-MAX_TEXT_LENGTH = int(os.environ.get("MAX_TEXT_LENGTH", 5000))
+MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB",2048))
+MAX_TEXT_LENGTH = int(os.environ.get("MAX_TEXT_LENGTH", 50))
 DEFAULT_TTL_MINUTES = int(os.environ.get("DEFAULT_TTL_MINUTES", 120))
+MAX_TTL_MINUTES = int(os.environ.get("MAX_TTL_MINUTES", 120))
 
 
 BASE_DIR = Path(__file__).parent

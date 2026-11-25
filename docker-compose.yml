@@ -15,4 +15,5 @@ services:
       - MAX_FILE_SIZE_MB=500
       - MAX_TEXT_LENGTH=10000
       - DEFAULT_TTL_MINUTES=120
+      - MAX_TTL_MINUTES=120
     restart: unless-stopped
