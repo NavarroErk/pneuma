@@ -201,7 +201,7 @@ function entryHtml(entry) {
     <li class="entry" data-id="${esc(entry.id)}" draggable="${isFile}">
       <div class="entry-icon">${isFile ? ICONS.file : ICONS.text}</div>
       <div class="entry-info">
-        <div class="entry-name">${esc(isFile ? entry.name : firstLine(entry.text_content))}</div>
+        <div class="entry-name">${esc(isFile ? entry.name : entry.name)}</div>
         <div class="entry-meta">${isFile ? formatBytes(entry.size) : `${esc(entry.size)} chars`} · <span class="ttl" data-expires="${esc(entry.expires_at)}"></span></div>
       </div>
       <div class="entry-actions">${isFile ? btn("download", "Download") : btn("copy", "Copy")}${btn("delete", "Delete")}</div>
@@ -234,9 +234,17 @@ function downloadEntry(entry) {
   a.click();
 }
 
-// copy a text entry to the clipboard
+// check if entry.name = size in db. copy current if true, request from db if false to get full textcontent
 async function copyEntry(entry) {
-  showToast((await copyText(entry.text_content)) ? "Copied" : "Couldn't copy");
+  try {
+    const text =
+      entry.size === entry.name.length
+        ? entry.name
+        : await request("GET", entryUrl(entry.id), null, null, "json");
+    showToast((await copyText(text)) ? "Copied" : "Couldn't copy");
+  } catch {
+    showToast("Couldn't copy");
+  }
 }
 
 async function copyText(text) {
@@ -244,14 +252,14 @@ async function copyText(text) {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.cssText = "position:fixed;opacity:0";
-    document.body.append(ta);
-    ta.select();
-    ta.setSelectionRange(0, text.length);
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.cssText = "position:fixed;opacity:0";
+    document.body.append(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, text.length);
     const ok = document.execCommand("copy");
-    ta.remove();
+    textarea.remove();
     return ok;
   }
 }
@@ -286,6 +294,7 @@ function confirmed(btn, label = "Confirm") {
 }
 
 const entryUrl = (id) => `${API_BASE}/entries/${encodeURIComponent(id)}`;
+
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const firstLine = (text = "") =>

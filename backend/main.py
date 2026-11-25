@@ -37,8 +37,8 @@ def get_health():
 @app.get("/entries")
 def get_entries(user_id: str = Depends(get_current_user), conn = Depends(get_db)):
   rows = conn.execute("""
-    SELECT id, type, name, mime_type, text_content, size, created_at, expires_at
-    FROM entries WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC 
+      SELECT id, type, name, mime_type, size, created_at, expires_at
+      FROM entries WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC
     """, [user_id, int(datetime.now().timestamp())]).fetchall()
   return rows
   
@@ -114,7 +114,7 @@ async def post_entries(
           raise HTTPException(413, f"Text too long. Max: {MAX_TEXT_LENGTH} characters")
       text_content = text
       size = len(text)
-      name = text
+      name = text[0:75]
         
   now = int(datetime.now().timestamp())
   created_at = now
