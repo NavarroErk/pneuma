@@ -113,3 +113,10 @@ def select_user_by_username(username: str, conn):
        FROM users
        WHERE username = ?
     """, [username]).fetchone()
+    
+def select_session_by_token_hash(token_hash: str, now: int, conn):
+    return conn.execute("""
+       SELECT user_id, token_hash, expires_at
+       FROM sessions
+       WHERE token_hash = ? AND expires_at > ?
+    """, [token_hash, now]).fetchone()

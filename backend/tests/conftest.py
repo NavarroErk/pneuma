@@ -18,4 +18,6 @@ def client(tmp_path, monkeypatch):
 
     # run the app's startup (create the table) and shutdown
     with TestClient(main.app) as c:
+        token = c.post("/setup", data={"username": "admin", "password": "password"}).json()["token"]
+        c.headers["Authorization"] = f"Bearer {token}"
         yield c
