@@ -8,11 +8,12 @@ import os
 import uuid
 import mimetypes
 import asyncio
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 
 from config import init_directories, MAX_FILE_SIZE_MB, MAX_TEXT_LENGTH, DEFAULT_TTL_MINUTES, MAX_TTL_MINUTES, UPLOADS_DIR, FRONTEND_DIR
-from db import init_db, get_db, cleanup_loop, cleanup_expired
-from auth import get_current_user
-from pathlib import Path
+from db import setup_admin, db_has_users, init_db, get_db, cleanup_loop, select_user_by_username
+from auth import get_current_user, create_session
 
 
 
@@ -20,7 +21,7 @@ from pathlib import Path
 async def lifespan(app:FastAPI):
     init_directories()
     init_db()
-    get_current_user()
+    # get_current_user()
 
     task = asyncio.create_task(cleanup_loop())
     
@@ -29,19 +30,63 @@ async def lifespan(app:FastAPI):
     task.cancel()
 
 app = FastAPI(lifespan=lifespan)
+hasher = PasswordHasher()
+
 
 @app.get("/health")
 def get_health():
   return {"status": "ok"}
 
 @app.get("/config")
-def get_config():
+def get_config(conn=Depends(get_db)):
   return {
+    "needs_setup": not db_has_users(conn),
     "max_file_size_mb": MAX_FILE_SIZE_MB,
     "max_text_length": MAX_TEXT_LENGTH,
     "default_ttl_minutes": DEFAULT_TTL_MINUTES,
     "max_ttl_minutes": MAX_TTL_MINUTES
   }
+
+@app.post("/setup")
+def post_setup(
+  username: str = Form(...),
+  password: str = Form(...),
+  conn = Depends(get_db)
+):
+  user_id = str(uuid.uuid4())
+  password_hash = hasher.hash(password)
+  role = "admin"
+
+  # attempt to create admin user, else raise 409
+  if not setup_admin(user_id, username, password_hash, role, conn):
+    raise HTTPException(409, "Setup is already complete")
+  
+  # return json for browser to read
+  return {"token" : create_session(user_id, conn)}
+
+
+@app.post("/login")
+def post_login(
+  username: str = Form(...),
+  password: str = Form(...),
+  conn = Depends(get_db)
+):
+  row = select_user_by_username(username, conn)
+  if row is None:
+    raise HTTPException(401, "Invalid username or password")
+  
+  try:
+    hasher.verify(row["password_hash"], password)
+    
+  except VerifyMismatchError:
+    raise HTTPException(401, "Invalid username or password")
+  
+  return {"token": create_session(row["id"], conn)}
+
+
+
+
+
 
 @app.get("/entries")
 def get_entries(user_id: str = Depends(get_current_user), conn = Depends(get_db)):
