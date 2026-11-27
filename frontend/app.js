@@ -113,7 +113,7 @@ dropper.addEventListener("drop", (e) => {
 
 // ctrl+v anywhere to stage files; text gets pasted into full size textbox
 document.addEventListener("paste", (e) => {
-  if (settings.open) return;
+  if (settings.open || !$("auth").hidden) return; // let paste go into the login fields
   const file = e.clipboardData.files[0];
   const text = e.clipboardData.getData("text/plain");
   if (e.target === $("staged-text") && !file) return;
@@ -187,6 +187,9 @@ function request(method, url, body, onProgress, responseType = "") {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open(method, url);
+    // retrieve token from localStorage, attach to request as header
+    const token = localStorage.getItem("token");
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
     xhr.responseType = responseType;
     if (onProgress) {
       (body ? xhr.upload : xhr).onprogress = (e) => {
@@ -194,8 +197,15 @@ function request(method, url, body, onProgress, responseType = "") {
           onProgress(Math.round((e.loaded / e.total) * 100));
       };
     }
-    xhr.onload = () =>
+
+    // remove token from localStorage on server token rejection
+    xhr.onload = () => {
+      if (xhr.status === 401) {
+        localStorage.removeItem("token");
+        showAuth("login");
+      }
       xhr.status < 300 ? resolve(xhr.response) : reject(errorMessage(xhr));
+    };
     xhr.onerror = () => reject("Couldn't reach the server.");
     // if body (file upload), no timeout
     xhr.timeout = body ? 0 : 10000;
@@ -444,11 +454,60 @@ async function loadConfig() {
     res["max_text_length"].toLocaleString() + " Characters";
   $("cfg-default-ttl").textContent = formatDuration(res["default_ttl_minutes"]);
   $("cfg-max-ttl").textContent = formatDuration(res["max_ttl_minutes"]);
+  return res;
 }
 
-refresh();
-loadConfig();
+// login/register screen
+let authMode = "login"; // "login" or "register"
+
+// show auth screen in the given mode (above) and hide the app
+function showAuth(mode) {
+  authMode = mode;
+  const isRegister = mode === "register";
+
+  $("auth-title").textContent = isRegister ? "Register" : "Log in";
+  $("auth-submit").textContent = isRegister ? "Register" : "Log in";
+  $("auth-switch").textContent = isRegister ? "Log in" : "Register";
+  $("auth-confirm-row").hidden = !isRegister;
+  $("auth-confirm").required = isRegister;
+
+  // unhide auth form section, hide topbar and app when in auth mode
+  $("auth").hidden = false;
+  document.querySelector(".topbar").hidden = true;
+  document.querySelector(".app").hidden = true;
+}
+
+// hide the auth screen and show the app
+function hideAuth() {
+  $("auth").hidden = true;
+  document.querySelector(".topbar").hidden = false;
+  document.querySelector(".app").hidden = false;
+}
+
+$("auth-switch").addEventListener("click", () =>
+  showAuth(authMode === "login" ? "register" : "login"),
+);
+
+// submit logic comes later; for now just stop the page from reloading
+$("auth-form").addEventListener("submit", (e) => e.preventDefault());
+
+async function init() {
+  const config = await loadConfig();
+  if (config?.needs_setup) {
+    return showAuth("register");
+  }
+  if (!localStorage.getItem("token")) {
+    return showAuth("login");
+  }
+  // wait for token check
+  await refresh();
+  if ($("auth").hidden) {
+    hideAuth();
+  }
+}
+
+init();
 setInterval(updateTimes, 1000);
 setInterval(() => {
-  if (!document.hidden) refresh();
+  if (!document.hidden && $("auth").hidden) refresh();
 }, POLL_MS);

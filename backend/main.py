@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Form, File, UploadFile
+from fastapi import FastAPI, Depends, Header, HTTPException, Form, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
@@ -8,12 +8,13 @@ import os
 import uuid
 import mimetypes
 import asyncio
+import sqlite3
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
 from config import init_directories, MAX_FILE_SIZE_MB, MAX_TEXT_LENGTH, DEFAULT_TTL_MINUTES, MAX_TTL_MINUTES, UPLOADS_DIR, FRONTEND_DIR
-from db import setup_admin, db_has_users, init_db, get_db, cleanup_loop, select_user_by_username
-from auth import get_current_user, create_session
+from db import setup_admin, db_has_users, init_db, get_db, cleanup_loop, select_user_by_username, delete_session_by_token_hash
+from auth import get_current_user, create_session, hash_token
 
 
 
@@ -38,7 +39,7 @@ def get_health():
   return {"status": "ok"}
 
 @app.get("/config")
-def get_config(conn=Depends(get_db)):
+def get_config(conn: sqlite3.Connection = Depends(get_db)):
   return {
     "needs_setup": not db_has_users(conn),
     "max_file_size_mb": MAX_FILE_SIZE_MB,
@@ -51,7 +52,7 @@ def get_config(conn=Depends(get_db)):
 def post_setup(
   username: str = Form(...),
   password: str = Form(...),
-  conn = Depends(get_db)
+  conn: sqlite3.Connection = Depends(get_db)
 ):
   user_id = str(uuid.uuid4())
   password_hash = hasher.hash(password)
@@ -69,7 +70,7 @@ def post_setup(
 def post_login(
   username: str = Form(...),
   password: str = Form(...),
-  conn = Depends(get_db)
+  conn: sqlite3.Connection = Depends(get_db)
 ):
   row = select_user_by_username(username, conn)
   if row is None:
@@ -84,12 +85,26 @@ def post_login(
   return {"token": create_session(row["id"], conn)}
 
 
+@app.post("/logout", status_code=204)
+def post_logout(
+  authorization: str | None = Header(None),
+  user_id = Depends(get_current_user),
+  conn: sqlite3.Connection = Depends(get_db)
+  ):
+    # get_current_user already returns 401 if missing, authorization is confirmed to be not None
+    assert authorization is not None 
+    raw_token = authorization[7:]
+    token_hash = hash_token(raw_token)
+    delete_session_by_token_hash(token_hash, conn)
 
 
 
 
 @app.get("/entries")
-def get_entries(user_id: str = Depends(get_current_user), conn = Depends(get_db)):
+def get_entries(
+  user_id: str = Depends(get_current_user), 
+  conn: sqlite3.Connection = Depends(get_db)
+  ):
   rows = conn.execute("""
       SELECT id, type, name, mime_type, size, created_at, expires_at
       FROM entries WHERE user_id = ? AND expires_at > ? ORDER BY created_at DESC
@@ -97,7 +112,11 @@ def get_entries(user_id: str = Depends(get_current_user), conn = Depends(get_db)
   return rows
   
 @app.get("/entries/{entry_id}")
-def get_entry_by_id(entry_id: str, user_id: str = Depends(get_current_user), conn = Depends(get_db)):
+def get_entry_by_id(
+  entry_id: str, 
+  user_id: str = Depends(get_current_user), 
+  conn: sqlite3.Connection = Depends(get_db)
+  ):
   row = conn.execute("""
     SELECT *
     FROM entries WHERE id = ? AND user_id = ? AND expires_at > ?
@@ -129,7 +148,7 @@ async def post_entries(
   text: str | None = Form(None),
   ttl_minutes: int = Form(DEFAULT_TTL_MINUTES, ge=1, le=MAX_TTL_MINUTES),
   user_id: str = Depends(get_current_user),
-  conn = Depends(get_db)
+  conn: sqlite3.Connection = Depends(get_db)
   ):
   
   entry_id = str(uuid.uuid4())
@@ -204,7 +223,11 @@ async def post_entries(
   return {"id": entry_id}
 
 @app.delete("/entries/{entry_id}", status_code=204)
-def delete_entry_by_id(entry_id: str, user_id: str = Depends(get_current_user), conn = Depends(get_db)):
+def delete_entry_by_id(
+  entry_id: str, 
+  user_id: str = Depends(get_current_user), 
+  conn: sqlite3.Connection = Depends(get_db)
+  ):
   row = conn.execute("""
     SELECT id, type FROM entries WHERE id = ? AND user_id = ?
   """, [entry_id, user_id]).fetchone()
@@ -220,7 +243,10 @@ def delete_entry_by_id(entry_id: str, user_id: str = Depends(get_current_user), 
   conn.commit()
   
 @app.delete("/entries", status_code=204)
-def delete_entries(user_id: str = Depends(get_current_user), conn = Depends(get_db)):
+def delete_entries(
+  user_id: str = Depends(get_current_user), 
+  conn: sqlite3.Connection = Depends(get_db)
+  ):
   files = conn.execute(
     "SELECT id FROM entries WHERE user_id = ? AND type = 'file'", [user_id]
   ).fetchall()

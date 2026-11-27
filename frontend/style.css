@@ -148,6 +148,34 @@ body {
     font-weight: 600;
 }
 
+/* login / register screen: logo + form centered, sitting a bit above the middle */
+.auth {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 18px 18px 12vh;
+}
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 320px;
+}
+.auth-form h1 {
+    margin: 0;
+    font-size: 20px;
+    text-align: center;
+}
+.auth-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 .conn {
     width: 7px;
     height: 7px; 

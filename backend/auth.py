@@ -39,3 +39,5 @@ def create_session(user_id, conn):
     insert_session_to_db(user_id, token_hash, expires_at, conn)
     # return raw token
     return rand_token
+
+

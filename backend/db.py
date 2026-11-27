@@ -86,10 +86,16 @@ def cleanup_expired():
         conn.execute("DELETE FROM sessions WHERE expires_at <= ?", [now])
         conn.commit()
 
-def db_has_users(conn):
+def db_has_users(conn: sqlite3.Connection):
     return conn.execute("SELECT 1 FROM users LIMIT 1").fetchone() is not None        
 
-def setup_admin(user_id: str, username: str, password_hash: str, role: str, conn):
+def setup_admin(
+    user_id: str, 
+    username: str, 
+    password_hash: str, 
+    role: str, 
+    conn: sqlite3.Connection
+    ):
     # insert conditional on check whether a single user exists
     cursor = conn.execute("""
        INSERT INTO users (id, username, password_hash, role)
@@ -99,7 +105,12 @@ def setup_admin(user_id: str, username: str, password_hash: str, role: str, conn
     conn.commit()
     return cursor.rowcount == 1
 
-def insert_session_to_db(user_id, token_hash, expires_at, conn):
+def insert_session_to_db(
+    user_id: str, 
+    token_hash: str, 
+    expires_at: int, 
+    conn: sqlite3.Connection
+    ):
     conn.execute("""
        INSERT INTO sessions (user_id, token_hash, expires_at)
        VALUES (?, ?, ?)
@@ -107,16 +118,30 @@ def insert_session_to_db(user_id, token_hash, expires_at, conn):
     conn.commit()
     
 
-def select_user_by_username(username: str, conn):
+def select_user_by_username(
+    username: str, 
+    conn: sqlite3.Connection
+    ):
     return conn.execute("""
        SELECT id, password_hash, role
        FROM users
        WHERE username = ?
     """, [username]).fetchone()
     
-def select_session_by_token_hash(token_hash: str, now: int, conn):
+def select_session_by_token_hash(
+    token_hash: str, 
+    now: int, 
+    conn: sqlite3.Connection
+    ):
     return conn.execute("""
        SELECT user_id, token_hash, expires_at
        FROM sessions
        WHERE token_hash = ? AND expires_at > ?
     """, [token_hash, now]).fetchone()
+    
+def delete_session_by_token_hash(
+    token_hash: str, 
+    conn: sqlite3.Connection
+    ):
+    conn.execute("DELETE FROM sessions WHERE token_hash = ?", [token_hash])
+    conn.commit()

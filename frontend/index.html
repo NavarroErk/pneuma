@@ -11,7 +11,7 @@
 </head>
 
 <body>
-    <header class="topbar">
+    <header class="topbar" hidden>
         <p class="brand">pne<span class="brand-accent">uma</span></p>
         <div class="topbar-right">
             <button type="button" id="settings-btn" class="icon-btn" aria-label="Settings" title="Settings">
@@ -49,7 +49,35 @@
         </div>
     </dialog>
 
-    <main class="app">
+    <!-- login/register screen; shown when no valid token is found -->
+    <section id="auth" class="auth" hidden>
+        <p class="brand">pne<span class="brand-accent">uma</span></p>
+
+        <form id="auth-form" class="auth-form">
+            <h1 id="auth-title">Log in</h1>
+
+            <label>
+                Username
+                <input id="auth-username" autocomplete="username" required>
+            </label>
+
+            <label>
+                Password
+                <input id="auth-password" type="password" autocomplete="current-password" required>
+            </label>
+
+            <!-- register only -->
+            <label id="auth-confirm-row">
+                Confirm password
+                <input id="auth-confirm" type="password" autocomplete="new-password">
+            </label>
+
+            <button type="submit" id="auth-submit">Log in</button>
+            <button type="button" id="auth-switch">Need an account? Register</button>
+        </form>
+    </section>
+
+    <main class="app" hidden>
         <section id="dropper" class="dropper" tabindex="0" role="button" aria-label="Add a file or text">
             <div id="dropper-hint" class="dropper-hint">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
