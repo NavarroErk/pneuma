@@ -46,6 +46,10 @@
                 <p>Maximum Time to Live: <span id="cfg-max-ttl">– Minutes</span></p>
             </div>
 
+            <div class="modal-footer">
+                <button type="button" id="logout-btn" class="btn">Log out</button>
+            </div>
+
         </div>
     </dialog>
 
@@ -54,8 +58,6 @@
         <p class="brand">pne<span class="brand-accent">uma</span></p>
 
         <form id="auth-form" class="auth-form">
-            <h1 id="auth-title">Log in</h1>
-
             <label>
                 Username
                 <input id="auth-username" autocomplete="username" required>
@@ -72,9 +74,14 @@
                 <input id="auth-confirm" type="password" autocomplete="new-password">
             </label>
 
-            <button type="submit" id="auth-submit">Log in</button>
-            <button type="button" id="auth-switch">Need an account? Register</button>
+            <button type="submit" id="auth-submit" class="btn btn-accent auth-submit">Log in</button>
         </form>
+
+        <!-- "Need an account? Register" / "Have an account? Log in" -->
+        <p class="auth-switch">
+            <span id="auth-switch-text">Need an account?</span>
+            <button type="button" id="auth-switch" class="link-btn">Register</button>
+        </p>
     </section>
 
     <main class="app" hidden>

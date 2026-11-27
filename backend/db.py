@@ -95,7 +95,7 @@ def setup_admin(
     password_hash: str, 
     role: str, 
     conn: sqlite3.Connection
-    ):
+):
     # insert conditional on check whether a single user exists
     cursor = conn.execute("""
        INSERT INTO users (id, username, password_hash, role)
@@ -105,12 +105,26 @@ def setup_admin(
     conn.commit()
     return cursor.rowcount == 1
 
+def insert_user(
+    user_id: str, 
+    username: str, 
+    password_hash: str, 
+    role: str, 
+    conn: sqlite3.Connection
+):
+    conn.execute(
+        "INSERT INTO users (id, username, password_hash, role) VALUES (?, ?, ?, ?)",
+        [user_id, username, password_hash, role],
+    )
+    conn.commit()
+
+
 def insert_session_to_db(
     user_id: str, 
     token_hash: str, 
     expires_at: int, 
     conn: sqlite3.Connection
-    ):
+):
     conn.execute("""
        INSERT INTO sessions (user_id, token_hash, expires_at)
        VALUES (?, ?, ?)
@@ -121,7 +135,7 @@ def insert_session_to_db(
 def select_user_by_username(
     username: str, 
     conn: sqlite3.Connection
-    ):
+):
     return conn.execute("""
        SELECT id, password_hash, role
        FROM users
@@ -132,7 +146,7 @@ def select_session_by_token_hash(
     token_hash: str, 
     now: int, 
     conn: sqlite3.Connection
-    ):
+):
     return conn.execute("""
        SELECT user_id, token_hash, expires_at
        FROM sessions
@@ -142,6 +156,6 @@ def select_session_by_token_hash(
 def delete_session_by_token_hash(
     token_hash: str, 
     conn: sqlite3.Connection
-    ):
+):
     conn.execute("DELETE FROM sessions WHERE token_hash = ?", [token_hash])
     conn.commit()

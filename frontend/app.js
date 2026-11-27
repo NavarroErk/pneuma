@@ -30,6 +30,7 @@ let lastSignature = "";
 let maxTextLength = 0; // set from /config
 let maxFileBytes = 0; // set from /config
 let maxTtl = 0; // minutes, set from /config
+let needsSetup = false;
 
 // current/max - under the textarea; red when over
 function updateCounter() {
@@ -130,6 +131,19 @@ settings.addEventListener("click", (e) => {
   if (e.target === settings) settings.close();
 });
 
+// end session on the server, then remove the token in browser
+$("logout-btn").addEventListener("click", async () => {
+  try {
+    await request("POST", `${API_BASE}/logout`);
+  } catch {
+    // server unreachable, still remove token;
+  }
+  localStorage.removeItem("token");
+  settings.close();
+  showAuth("login");
+  showToast("Logged out");
+});
+
 $("submit-btn").addEventListener("click", upload);
 $("cancel-btn").addEventListener("click", clearStaged);
 
@@ -217,7 +231,12 @@ function request(method, url, body, onProgress, responseType = "") {
 // get FastAPI detail message from error response
 function errorMessage(xhr) {
   try {
-    const { detail } = JSON.parse(xhr.responseText);
+    // json requests give an object; others give text that still needs parsing
+    const body =
+      typeof xhr.response === "string"
+        ? JSON.parse(xhr.response)
+        : xhr.response;
+    const { detail } = body;
     const msg = Array.isArray(detail) ? detail[0]?.msg : detail;
     if (msg) return msg;
   } catch {}
@@ -290,11 +309,18 @@ $("entries").addEventListener("click", (e) => {
 });
 
 // download a file from the server
-function downloadEntry(entry) {
-  const a = document.createElement("a");
-  a.href = entryUrl(entry.id);
-  a.download = entry.name;
-  a.click();
+async function downloadEntry(entry) {
+  try {
+    // fetch the whole file with the auth token; the browser holds it in memory as a blob
+    const blob = await request("GET", entryUrl(entry.id), null, null, "blob");
+    const a = document.createElement("a"); // invisible link
+    a.href = URL.createObjectURL(blob); // temporary URL pointing to the blob
+    a.download = entry.name; // save with the original filename
+    a.click();
+    URL.revokeObjectURL(a.href); // free the temporary URL
+  } catch {
+    showToast("Couldn't download");
+  }
 }
 
 // check if entry.name = size in db. copy current if true, request from db if false to get full textcontent
@@ -462,11 +488,14 @@ let authMode = "login"; // "login" or "register"
 
 // show auth screen in the given mode (above) and hide the app
 function showAuth(mode) {
+  settings.close(); // close settings (if open) when redirected to auth
   authMode = mode;
   const isRegister = mode === "register";
 
-  $("auth-title").textContent = isRegister ? "Register" : "Log in";
   $("auth-submit").textContent = isRegister ? "Register" : "Log in";
+  $("auth-switch-text").textContent = isRegister
+    ? "Have an account?"
+    : "Need an account?";
   $("auth-switch").textContent = isRegister ? "Log in" : "Register";
   $("auth-confirm-row").hidden = !isRegister;
   $("auth-confirm").required = isRegister;
@@ -479,6 +508,7 @@ function showAuth(mode) {
 
 // hide the auth screen and show the app
 function hideAuth() {
+  $("auth-form").reset(); // clear user/pw from form
   $("auth").hidden = true;
   document.querySelector(".topbar").hidden = false;
   document.querySelector(".app").hidden = false;
@@ -488,12 +518,40 @@ $("auth-switch").addEventListener("click", () =>
   showAuth(authMode === "login" ? "register" : "login"),
 );
 
-// submit logic comes later; for now just stop the page from reloading
-$("auth-form").addEventListener("submit", (e) => e.preventDefault());
+// read username/password
+$("auth-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+
+  if (
+    authMode === "register" &&
+    $("auth-password").value !== $("auth-confirm").value
+  ) {
+    return showToast("Passwords don't match");
+  }
+
+  const form = new FormData();
+  form.append("username", $("auth-username").value);
+  form.append("password", $("auth-password").value);
+
+  // form URL based on authMode "login"/"register"
+  const url =
+    authMode === "login" ? "/login" : needsSetup ? "/setup" : "/register";
+  // send form to endpoint and set token in localStorage
+  try {
+    const res = await request("POST", `${API_BASE}${url}`, form, null, "json");
+    localStorage.setItem("token", res.token);
+    needsSetup = false;
+    hideAuth();
+    refresh();
+  } catch (msg) {
+    showToast(msg);
+  }
+});
 
 async function init() {
   const config = await loadConfig();
   if (config?.needs_setup) {
+    needsSetup = true;
     return showAuth("register");
   }
   if (!localStorage.getItem("token")) {

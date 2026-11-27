@@ -130,6 +130,12 @@ body {
     overflow-y: auto;
     padding: 18px;
 }
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    padding: 14px 18px;
+    border-top: 1px solid var(--border);
+}
 .modal-content p {
     display: flex;
     justify-content: space-between;
@@ -155,25 +161,72 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 24px;
+    gap: 20px;
     padding: 18px 18px 12vh;
 }
+.auth .brand {
+    margin-bottom: 8px;
+    font-size: 34px;
+}
+
+/* the card holding the inputs and submit button */
 .auth-form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
     width: 100%;
-    max-width: 320px;
-}
-.auth-form h1 {
-    margin: 0;
-    font-size: 20px;
-    text-align: center;
+    max-width: 340px;
+    padding: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
 }
 .auth-form label {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 13px;
+}
+.auth-form input {
+    padding: 10px 12px;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font: inherit;
+    font-size: 15px;
+}
+.auth-form input:hover {
+    border-color: var(--border-hover);
+}
+.auth-form input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+.auth-submit {
+    justify-content: center;
+    margin-top: 6px;
+    padding: 10px 12px;
+    font-size: 15px;
+}
+
+/* This is the "Need an account? Register" line under the card */
+.auth-switch {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+}
+.link-btn {
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+}
+.link-btn:hover {
+    text-decoration: underline;
 }
 
 .conn {

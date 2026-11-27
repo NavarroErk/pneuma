@@ -13,7 +13,7 @@ from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 
 from config import init_directories, MAX_FILE_SIZE_MB, MAX_TEXT_LENGTH, DEFAULT_TTL_MINUTES, MAX_TTL_MINUTES, UPLOADS_DIR, FRONTEND_DIR
-from db import setup_admin, db_has_users, init_db, get_db, cleanup_loop, select_user_by_username, delete_session_by_token_hash
+from db import setup_admin, insert_user, db_has_users, init_db, get_db, cleanup_loop, select_user_by_username, delete_session_by_token_hash
 from auth import get_current_user, create_session, hash_token
 
 
@@ -62,6 +62,23 @@ def post_setup(
   if not setup_admin(user_id, username, password_hash, role, conn):
     raise HTTPException(409, "Setup is already complete")
   
+  # return json for browser to read
+  return {"token" : create_session(user_id, conn)}
+
+@app.post("/register")
+def post_register(
+  username: str = Form(...),
+  password: str = Form(...),
+  conn: sqlite3.Connection = Depends(get_db)
+):
+  user_id = str(uuid.uuid4())
+  password_hash = hasher.hash(password)
+  role = "user"
+
+  try:
+    insert_user(user_id, username, password_hash, role, conn)
+  except sqlite3.IntegrityError:
+    raise HTTPException(status_code=409, detail="Username is taken")
   # return json for browser to read
   return {"token" : create_session(user_id, conn)}
 
